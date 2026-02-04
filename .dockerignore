@@ -1,0 +1,14 @@
+# Exclude local data and virtual environments
+user_data/
+recordings/
+error_screenshots/
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.git/
+.gitignore
+Dockerfile
+INTERNAL_NOTES.md
