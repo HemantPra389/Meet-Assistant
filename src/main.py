@@ -36,8 +36,7 @@ def main():
     is_headless = args.headless
     if args.signin:
         logger.info("Manual sign-in requested: Forcing NON-HEADLESS mode.")
-        is_headless = True
-        # is_headless = False
+        is_headless = False
 
     bot = MeetBot(args.meeting_url, args.auth_dir, is_headless)
 

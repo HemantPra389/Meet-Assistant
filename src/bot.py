@@ -11,7 +11,7 @@ from src.recorder import MeetingRecorder
 logger = setup_logger(__name__)
 
 class MeetBot:
-    def __init__(self, meeting_url: str, auth_dir: str, headless: bool = True):
+    def __init__(self, meeting_url: str, auth_dir: str, headless: bool = False):
         self.meeting_url = meeting_url
         self.auth_dir = auth_dir
         self.headless = headless
