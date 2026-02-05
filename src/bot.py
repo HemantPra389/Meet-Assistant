@@ -45,21 +45,22 @@ class MeetBot:
             logger.info(f"Navigating to {self.meeting_url}")
             self.page.goto(self.meeting_url)
 
-            state = self._detect_auth_state()
+            # state = self._detect_auth_state()
 
-            if state == "AUTH_REQUIRED":
-                raise Exception("Google account not signed in. Aborting.")
+            # if state == "AUTH_REQUIRED":
+            #     raise Exception("Google account not signed in. Aborting.")
 
-            if state == "GUEST_NOT_ALLOWED":
-                raise Exception("Guest flow detected. Signed-in user required.")
+            # if state == "GUEST_NOT_ALLOWED":
+            #     raise Exception("Guest flow detected. Signed-in user required.")
 
-            if state != "AUTHENTICATED":
-                raise Exception(f"Unexpected Meet state: {state}")
+            # if state != "AUTHENTICATED":
+            #     raise Exception(f"Unexpected Meet state: {state}")
 
-            logger.info("Authenticated session confirmed.")
+            # logger.info("Authenticated session confirmed.")
 
             self._wait_for_lobby()
             self._toggle_media()
+            self._enter_name()
             self._click_join_button()
             self._wait_for_successful_entry()
             
