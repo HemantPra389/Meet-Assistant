@@ -37,12 +37,17 @@ SELECTORS = {
     "sign_in_button": 'button:has-text("Sign in")',
     # Detection for empty meeting (Dynamic, but often contains "No one else is here")
     "no_one_here_text": 'text="No one else is here"',
+    
+    # Permissions Popup
+    "permissions_popup": 'text="Do you want people to see and hear you in the meeting?"',
+    "dismiss_permissions_btn": 'button:has-text("Continue without microphone and camera")',
 }
 
 # Browser Launch Arguments
 BROWSER_LAUNCH_ARGS = [
     "--disable-blink-features=AutomationControlled", # Avoids basic selenium/bot detection
     "--use-fake-ui-for-media-stream",  # Auto-accepts permission prompts for camera/mic
+    "--use-fake-device-for-media-stream", # Provides a fake camera/mic device
     "--disable-notifications",
     "--no-default-browser-check"
 ]

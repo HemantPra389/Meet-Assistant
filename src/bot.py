@@ -7,6 +7,8 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 from src.config import SELECTORS, BROWSER_LAUNCH_ARGS, TIMEOUTS, CHECK_INTERVAL, EMPTY_MEETING_TIMEOUT
 from src.logger import setup_logger
 from src.recorder import MeetingRecorder
+import os
+import datetime
 
 logger = setup_logger(__name__)
 
@@ -19,6 +21,9 @@ class MeetBot:
         self.browser_context = None
         self.page = None
         self.recorder = MeetingRecorder()
+        
+        # Ensure debug directory exists
+        os.makedirs("debug_screenshots", exist_ok=True)
 
 
     def start(self, bootstrap_signin: bool = False):
@@ -28,9 +33,10 @@ class MeetBot:
         logger.info(f"Launching browser (Headless: {self.headless}, Auth: {self.auth_dir})")
         self.browser_context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=self.auth_dir,
-            headless=self.headless,
+            headless=True,
             args=BROWSER_LAUNCH_ARGS,
         )
+        self.browser_context.grant_permissions(permissions=["microphone", "camera"])
 
         self.page = self.browser_context.new_page()
 
@@ -76,12 +82,14 @@ class MeetBot:
 
         except PlaywrightTimeoutError as e:
             logger.error(f"Timeout Error: {e}")
+            self._save_debug_screenshot("timeout_error")
             self.stop()
         except KeyboardInterrupt:
             logger.info("User interrupted the process.")
             self.stop()
         except Exception as e:
             logger.error(f"Join aborted: {e}", exc_info=True)
+            self._save_debug_screenshot("join_error")
             self.stop()
         finally:
             # Ensure we always clean up (close browser/ffmpeg) even on normal exit
@@ -151,13 +159,31 @@ class MeetBot:
 
 
     def _wait_for_lobby(self):
-        """Waits for the 'Ready to join' screen indicators."""
+        """Waits for the 'Ready to join' screen indicators (Mic button OR Name Input)."""
         logger.info("Waiting for lobby to load...")
-        # Waiting for the mic button is a reliable proxy for the controls loading
-        self.page.wait_for_selector(
-            SELECTORS["lobby_validation"], 
-            timeout=TIMEOUTS["page_load"]
-        )
+
+        # 1. Handle "Permissions" popup if it appears
+        try:
+            if self.page.locator(SELECTORS["permissions_popup"]).is_visible(timeout=5000):
+                logger.info("Permissions popup detected. Dismissing...")
+                self.page.locator(SELECTORS["dismiss_permissions_btn"]).click()
+                self.page.wait_for_timeout(1000)
+        except Exception:
+            # It's okay if it doesn't appear or we don't catch it in time
+            pass
+        
+        # 2. Wait for either the mic button (Authenticated) OR name input (Guest)
+        try:
+            self.page.wait_for_selector(
+                f"{SELECTORS['lobby_validation']},{SELECTORS['name_input']}", 
+                state="visible",
+                timeout=TIMEOUTS["page_load"]
+            )
+        except PlaywrightTimeoutError:
+            # If standard wait fails, try to see if we are stuck on a login page
+            if self.page.locator(SELECTORS['sign_in_button']).count() > 0:
+                raise Exception("Stuck on Sign-In page. Auth required.")
+            raise
 
     def _toggle_media(self):
         """Ensures Microphone and Camera are turned off."""
@@ -335,6 +361,17 @@ class MeetBot:
             return False
 
 
+
+    def _save_debug_screenshot(self, suffix="error"):
+        """Saves a screenshot for debugging purposes."""
+        try:
+            if self.page:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"debug_screenshots/{timestamp}_{suffix}.png"
+                self.page.screenshot(path=filename)
+                logger.info(f"Screenshot saved to {filename}")
+        except Exception as e:
+            logger.warning(f"Failed to save debug screenshot: {e}")
 
     def stop(self):
         """Cleans up resources."""
