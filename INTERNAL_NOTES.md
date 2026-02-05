@@ -20,3 +20,9 @@ For N8n (check below)
 
 
  docker run -it -e NGROK_AUTHTOKEN=33YS1zBua2NTQMFDHmvdfYMXGwt_35eZWZz4ELywifdvq8Guc ngrok/ngrok:latest http --url=katherina-glottic-kallie.ngrok-free.dev host.docker.internal:80
+
+
+
+
+
+ docker run -it --rm   --network host   -e NGROK_AUTHTOKEN=33YS1zBua2NTQMFDHmvdfYMXGwt_35eZWZz4ELywifdvq8Guc   ngrok/ngrok:latest http 80
