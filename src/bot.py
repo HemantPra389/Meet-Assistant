@@ -33,7 +33,7 @@ class MeetBot:
         logger.info(f"Launching browser (Headless: {self.headless}, Auth: {self.auth_dir})")
         self.browser_context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=self.auth_dir,
-            headless=True,
+            headless=False,
             args=BROWSER_LAUNCH_ARGS,
         )
         self.browser_context.grant_permissions(permissions=["microphone", "camera"])
@@ -161,7 +161,7 @@ class MeetBot:
     def _wait_for_lobby(self):
         """Waits for the 'Ready to join' screen indicators (Mic button OR Name Input)."""
         logger.info("Waiting for lobby to load...")
-
+        # self._save_debug_screenshot("timeout_error")
         # 1. Handle "Permissions" popup if it appears
         try:
             if self.page.locator(SELECTORS["permissions_popup"]).is_visible(timeout=5000):
