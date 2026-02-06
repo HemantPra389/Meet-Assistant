@@ -33,7 +33,7 @@ class MeetBot:
         logger.info(f"Launching browser (Headless: {self.headless})")
         self.browser_context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=self.auth_dir,
-            headless=True,
+            headless=False,
             args=BROWSER_LAUNCH_ARGS,
         )
         # self.browser_context.grant_permissions(["microphone", "camera"])
