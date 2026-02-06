@@ -71,12 +71,12 @@ class MeetBot:
             self._wait_for_successful_entry()
             
             # Start Recording
-            try:
-                page_title = self.page.title()
-                logger.info(f"Page Title for recording: {page_title}")
-                self.recorder.start_recording(window_title=page_title)
-            except Exception as e:
-                logger.error(f"Failed to initiate recording: {e}")
+            # try:
+            #     page_title = self.page.title()
+            #     logger.info(f"Page Title for recording: {page_title}")
+            #     self.recorder.start_recording(window_title=page_title)
+            # except Exception as e:
+            #     logger.error(f"Failed to initiate recording: {e}")
 
             self._keep_alive()
 
@@ -161,16 +161,16 @@ class MeetBot:
     def _wait_for_lobby(self):
         """Waits for the 'Ready to join' screen indicators (Mic button OR Name Input)."""
         logger.info("Waiting for lobby to load...")
-        # self._save_debug_screenshot("timeout_error")
+        self._save_debug_screenshot("timeout_error")
         # 1. Handle "Permissions" popup if it appears
-        try:
-            if self.page.locator(SELECTORS["permissions_popup"]).is_visible(timeout=5000):
-                logger.info("Permissions popup detected. Dismissing...")
-                self.page.locator(SELECTORS["dismiss_permissions_btn"]).click()
-                self.page.wait_for_timeout(1000)
-        except Exception:
-            # It's okay if it doesn't appear or we don't catch it in time
-            pass
+        # try:
+        #     if self.page.locator(SELECTORS["permissions_popup"]).is_visible(timeout=5000):
+        #         logger.info("Permissions popup detected. Dismissing...")
+        #         self.page.locator(SELECTORS["dismiss_permissions_btn"]).click()
+        #         self.page.wait_for_timeout(1000)
+        # except Exception:
+        #     # It's okay if it doesn't appear or we don't catch it in time
+        #     pass
         
         # 2. Wait for either the mic button (Authenticated) OR name input (Guest)
         try:
@@ -267,38 +267,49 @@ class MeetBot:
         """Keeps the script running to maintain the browser session and monitors meeting status."""
         logger.info("Bot is active. Monitoring meeting status...")
         logger.info("Press Ctrl+C to stop manually.")
-        
+        EMPTY_GRACE_PERIOD = 30  # seconds
         empty_since = None
 
         while True:
             time.sleep(CHECK_INTERVAL)
-            
-            # 1. Check if we have been disconnected (End of call screen)
+
+            # Safety: page died
+            if self.page.is_closed():
+                logger.info("Page closed. Exiting.")
+                break
+
+            # 1. Disconnected check
             try:
-                # "Returning to home screen" or "You've left the meeting"
-                if self.page.get_by_text("You've left the meeting").count() > 0 or \
-                   self.page.url == "about:blank": # Simple check
+                if (
+                    self.page.url == "about:blank" or
+                    self.page.locator("text=You've left the meeting").is_visible(timeout=500)
+                ):
                     logger.info("Meeting ended detected. Exiting...")
                     break
             except Exception:
                 pass
 
-            # 2. Check if meeting is empty
-            is_empty = self._is_meeting_empty()
+            # 2. Empty check
+            try:
+                is_empty = self._is_meeting_empty()
+            except Exception as e:
+                logger.warning(f"Empty check failed: {e}")
+                continue
+
+            now = time.monotonic()
+
             if is_empty:
                 if empty_since is None:
-                    empty_since = time.time()
-                    logger.info("Meeting appears empty. Timer started.")
-                
-                elapsed = time.time() - empty_since
-                if elapsed > EMPTY_MEETING_TIMEOUT:
-                    logger.info(f"Meeting has been empty for {elapsed:.0f}s. Leaving automatically.")
+                    empty_since = now
+                    logger.info("Meeting empty. 30s countdown started.")
+
+                elif now - empty_since >= EMPTY_GRACE_PERIOD:
+                    logger.info("Meeting empty for 30 seconds. Leaving.")
                     self._leave_call()
                     break
             else:
-                if empty_since is not None:
-                    logger.info("Meeting is no longer empty. Timer reset.")
-                    empty_since = None
+                empty_since = None
+
 
     def _leave_call(self):
         """Clicks the 'Leave call' button to properly exit the meeting."""
@@ -309,56 +320,78 @@ class MeetBot:
         except Exception as e:
             logger.warning(f"Failed to click leave button (might already be closed): {e}")
 
+
     def _is_meeting_empty(self) -> bool:
         """
-        Detect if the bot is alone by hovering over the participant avatar
-        and reading the People popup ('1 joined', 'Just you').
+        Detect if the bot is alone in the meeting by counting participant tiles.
+        Reliable in headless mode. No hover or UI text dependency.
         """
-        logger.info("Checking if meeting is empty via hover...")
-
         try:
-            # --------------------------------------------------
-            # 1. Hover on top-right participant/avatar area
-            # --------------------------------------------------
-            viewport = self.page.viewport_size
-            if not viewport:
-                logger.warning("Viewport size unavailable.")
-                return False
+            # Each participant (including self) has a data-participant-id
+            participants = self.page.locator('[data-participant-id]')
+            count = participants.count()
 
-            # Hover near top-right corner (where avatar + count lives)
-            hover_x = viewport["width"] - 40
-            hover_y = 40
+            logger.info(f"Detected {count} participant tile(s).")
 
-            self.page.mouse.move(hover_x, hover_y)
-            self.page.wait_for_timeout(300)  # allow popup to render
-
-            # --------------------------------------------------
-            # 2. Detect People popup content
-            # --------------------------------------------------
-            if self.page.get_by_text("Just you", exact=True).count() > 0:
-                logger.info("Empty meeting detected: 'Just you' (hover popup).")
-                return True
-
-            if self.page.get_by_text("1 joined", exact=True).count() > 0:
-                logger.info("Empty meeting detected: '1 joined' (hover popup).")
-                return True
-
-            # --------------------------------------------------
-            # 3. Defensive fallback: any 'joined' text starting with 1
-            # --------------------------------------------------
-            joined_texts = self.page.locator('*:has-text("joined")')
-
-            for i in range(joined_texts.count()):
-                txt = (joined_texts.nth(i).text_content() or "").strip().lower()
-                if txt.startswith("1 "):
-                    logger.info(f"Empty meeting detected via hover popup: '{txt}'.")
-                    return True
-
-            return False
+            # Only the bot itself is present
+            return count <= 1
 
         except Exception as e:
-            logger.warning(f"Hover-based empty check failed: {e}")
+            logger.warning(f"Failed to determine meeting emptiness: {e}")
             return False
+
+
+
+    # def _is_meeting_empty(self) -> bool:
+    #     """
+    #     Detect if the bot is alone by hovering over the participant avatar
+    #     and reading the People popup ('1 joined', 'Just you').
+    #     """
+    #     logger.info("Checking if meeting is empty via hover...")
+
+    #     try:
+    #         # --------------------------------------------------
+    #         # 1. Hover on top-right participant/avatar area
+    #         # --------------------------------------------------
+    #         viewport = self.page.viewport_size
+    #         if not viewport:
+    #             logger.warning("Viewport size unavailable.")
+    #             return False
+
+    #         # Hover near top-right corner (where avatar + count lives)
+    #         hover_x = viewport["width"] - 40
+    #         hover_y = 40
+
+    #         self.page.mouse.move(hover_x, hover_y)
+    #         self.page.wait_for_timeout(300)  # allow popup to render
+
+    #         # --------------------------------------------------
+    #         # 2. Detect People popup content
+    #         # --------------------------------------------------
+    #         if self.page.get_by_text("Just you", exact=True).count() > 0:
+    #             logger.info("Empty meeting detected: 'Just you' (hover popup).")
+    #             return True
+
+    #         if self.page.get_by_text("1 joined", exact=True).count() > 0:
+    #             logger.info("Empty meeting detected: '1 joined' (hover popup).")
+    #             return True
+
+    #         # --------------------------------------------------
+    #         # 3. Defensive fallback: any 'joined' text starting with 1
+    #         # --------------------------------------------------
+    #         joined_texts = self.page.locator('*:has-text("joined")')
+
+    #         for i in range(joined_texts.count()):
+    #             txt = (joined_texts.nth(i).text_content() or "").strip().lower()
+    #             if txt.startswith("1 "):
+    #                 logger.info(f"Empty meeting detected via hover popup: '{txt}'.")
+    #                 return True
+
+    #         return False
+
+    #     except Exception as e:
+    #         logger.warning(f"Hover-based empty check failed: {e}")
+    #         return False
 
 
 
