@@ -49,7 +49,11 @@ BROWSER_LAUNCH_ARGS = [
     "--use-fake-ui-for-media-stream",  # Auto-accepts permission prompts for camera/mic
     "--use-fake-device-for-media-stream", # Provides a fake camera/mic device
     "--disable-notifications",
-    "--no-default-browser-check"
+    "--no-default-browser-check",
+    "--disable-blink-features=AutomationControlled",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
 ]
 
 # Timeouts (in milliseconds)
