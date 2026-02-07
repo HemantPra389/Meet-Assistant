@@ -14,6 +14,8 @@ AUDIO_DEVICE_NAME = "Stereo Mix"
 RECORDINGS_DIR = "./recordings"
 VIDEO_RECORDING_ENABLED = True
 FRAMERATE = 30
+MIN_PARTICIPANTS_TO_RECORD = 2
+AUDIO_FORMAT = "wav"
 
 # Monitoring Settings
 CHECK_INTERVAL = 2  # Seconds between checks

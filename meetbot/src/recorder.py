@@ -5,7 +5,7 @@ import datetime
 import time
 from pathlib import Path
 from .logger import setup_logger
-from .config import FFMPEG_CMD, AUDIO_DEVICE_NAME, RECORDINGS_DIR, VIDEO_RECORDING_ENABLED, FRAMERATE
+from .config import FFMPEG_CMD, AUDIO_DEVICE_NAME, RECORDINGS_DIR, VIDEO_RECORDING_ENABLED, FRAMERATE, AUDIO_FORMAT
 
 logger = setup_logger(__name__)
 
@@ -31,19 +31,25 @@ class MeetingRecorder:
             return
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        ext = "mp4" if VIDEO_RECORDING_ENABLED else "mp3"
-        self.output_file = os.path.join(RECORDINGS_DIR, f"meeting_{timestamp}.{ext}")
+        
+        # Determine extension and format
+        ext = AUDIO_FORMAT if AUDIO_FORMAT else ("mp4" if VIDEO_RECORDING_ENABLED else "mp3")
+        filename = f"meeting_{timestamp}.{ext}"
+        self.output_file = os.path.abspath(os.path.join(RECORDINGS_DIR, filename))
+        logger.info(f"Preparing to record to: {self.output_file}")
 
         command = [FFMPEG_CMD]
 
-        # Video Input (gdigrab)
-        if VIDEO_RECORDING_ENABLED and window_title:
+        # Video Input (gdigrab) - ONLY if enabled AND format is not audio-only like wav/mp3
+        is_audio_only = ext in ["wav", "mp3", "aac"]
+        
+        if VIDEO_RECORDING_ENABLED and window_title and not is_audio_only:
             command.extend([
                 "-f", "gdigrab",
                 "-framerate", str(FRAMERATE),
                 "-i", f"title={window_title}"
             ])
-        elif VIDEO_RECORDING_ENABLED and not window_title:
+        elif VIDEO_RECORDING_ENABLED and not window_title and not is_audio_only:
              logger.warning("Video recording enabled but no window title provided. Falling back to audio only.")
 
         # Audio Input (dshow)
@@ -53,6 +59,10 @@ class MeetingRecorder:
         ])
 
         # Output options
+        if ext == "wav":
+             # Use pcm_s16le for standard WAV
+             command.extend(["-c:a", "pcm_s16le"])
+        
         command.extend([
             "-y", # Overwrite
             self.output_file

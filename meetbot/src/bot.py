@@ -124,7 +124,10 @@ class MeetBot:
     def _keep_alive(self):
         logger.info("Monitoring meeting...")
         empty_since = None
-        EMPTY_GRACE = 30
+        EMPTY_GRACE = 30 # Seconds
+        
+        # Import config here to avoid circular imports if any, or use self reference
+        from .config import MIN_PARTICIPANTS_TO_RECORD
 
         while True:
             time.sleep(CHECK_INTERVAL)
@@ -142,7 +145,23 @@ class MeetBot:
                 pass
 
             try:
-                is_empty = self._is_meeting_empty()
+                # Check participant count for recording logic
+                count = self._get_participant_count_safe()
+                logger.info(f"Current participants: {count}")
+                
+                # Recording Logic
+                if count > MIN_PARTICIPANTS_TO_RECORD:
+                    if not self.recorder.process:
+                         logger.info(f"Participant count ({count}) > {MIN_PARTICIPANTS_TO_RECORD}. Starting recording...")
+                         # We don't need window title for audio-only, but passing something is fine
+                         self.recorder.start_recording(window_title=None)
+                
+                # We do NOT stop recording if count drops, usually better to record until end.
+                # But if you wanted to stop when people leave, you could add logic here.
+                # For now, we record until the bot leaves.
+                
+                # Auto-leave Logic
+                is_empty = (count <= 1)
             except Exception:
                 continue
 
@@ -150,10 +169,29 @@ class MeetBot:
             if is_empty:
                 empty_since = empty_since or now
                 if now - empty_since >= EMPTY_GRACE:
+                    logger.info("Meeting empty for too long. Leaving...")
                     self._leave_call()
                     break
             else:
                 empty_since = None
+
+    def _get_participant_count_safe(self) -> int:
+        try:
+            # This selector finds the participant list items if visible, or the little badges
+            # A more robust way might be looking at the badge in the top right "You + X others"
+            # But iterating data-participant-id is a decent proxy if loaded.
+            # Note: Google Meet DOM is tricky. 
+            # Often appropriate to rely on the counter in the info bar if possible.
+            # For now, using the existing approach:
+            count = self.page.locator('[data-participant-id]').count()
+            # If count is 0 (DOM not loaded participant list), we might be alone or it's hidden.
+            # We can try to read the badge "u people"
+            # But let's stick to the locator we had, just wrapped safely.
+            # Logging spam reduced
+            # logger.debug(f"Detected {count} participant(s)")
+            return count
+        except Exception:
+            return 1 # Assume we are present at least
 
     def _leave_call(self):
         try:
