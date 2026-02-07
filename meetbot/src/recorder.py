@@ -4,8 +4,8 @@ import os
 import datetime
 import time
 from pathlib import Path
-from src.logger import setup_logger
-from src.config import FFMPEG_CMD, AUDIO_DEVICE_NAME, RECORDINGS_DIR, VIDEO_RECORDING_ENABLED, FRAMERATE
+from .logger import setup_logger
+from .config import FFMPEG_CMD, AUDIO_DEVICE_NAME, RECORDINGS_DIR, VIDEO_RECORDING_ENABLED, FRAMERATE
 
 logger = setup_logger(__name__)
 

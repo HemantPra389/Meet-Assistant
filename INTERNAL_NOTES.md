@@ -26,3 +26,22 @@ For N8n (check below)
 
 
  docker run -it --rm   --network host   -e NGROK_AUTHTOKEN=33YS1zBua2NTQMFDHmvdfYMXGwt_35eZWZz4ELywifdvq8Guc   ngrok/ngrok:latest http 80
+
+
+
+
+
+
+
+
+
+  xvfb-run -a python -m uvicorn src.api:app --host 0.0.0.0 --port 8000
+
+
+
+  # Make sure your virtual environment is activated
+python meetbot/src/main.py --meeting-url "https://meet.google.com/vpw-gchk-rme"
+
+
+
+  docker run --rm -it meetbot --meeting-url "https://meet.google.com/vpw-gchk-rme"

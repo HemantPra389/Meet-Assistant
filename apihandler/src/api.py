@@ -4,13 +4,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 import sys
 import os
+import subprocess
 import threading
 import uuid
 
-# Ensure project root is in path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from src.bot import MeetBot
 from src.logger import setup_logger
 
 logger = setup_logger("api")
@@ -52,14 +49,14 @@ BOTS_DB = {
     "bot-4": {"id": "bot-4", "email": "admin@company.com", "status": BotStatus.LOGIN_REQUIRED},
 }
 
-# Active Bot Instances (to keep them alive if needed, though for signin we might stop them)
-ACTIVE_BOTS = {}
+# Active Bot Processes (to keep track of subprocesses)
+ACTIVE_BOT_PROCESSES = {}
 
 # --- Background Tasks ---
 
 def run_manual_signin_flow(bot_id: str, email: str):
     """
-    Executes the MeetBot manual sign-in flow in a background thread.
+    Executes the MeetBot manual sign-in flow via CLI in a separate process.
     Updates the global BOTS_DB state based on outcome.
     """
     logger.info(f"Starting background sign-in for {bot_id} ({email})")
@@ -68,45 +65,49 @@ def run_manual_signin_flow(bot_id: str, email: str):
     if bot_id in BOTS_DB:
         BOTS_DB[bot_id]["status"] = BotStatus.LOGIN_IN_PROGRESS
 
-    # Define unique auth dir for this bot to avoid collisions (or use a shared one if intended)
-    # For this MVP, we'll assume a dedicated profile per bot ID
     auth_dir = os.path.join(os.getcwd(), "user_data", bot_id)
     
-    # Initialize Bot (Force visible)
-    # Note: MeetBot constructor expects (meeting_url, auth_dir, headless)
-    # For signin, meeting_url can be dummy
-    bot = MeetBot(meeting_url="https://meet.google.com", auth_dir=auth_dir, headless=False)
+    # Construct command
+    # Assuming running from project root or /app in Docker
+    # Path to main.py
+    script_path = os.path.join("meetbot", "src", "main.py")
+    if not os.path.exists(script_path):
+         # Fallback if running from a different context, but strict separation implies standardized paths
+         logger.error(f"Could not find bot script at {script_path}")
+         return
+
+    cmd = [
+        sys.executable, "-u", script_path,
+        "--signin",
+        "--auth-dir", auth_dir
+    ]
     
     try:
-        # This blocks until success or timeout
-        bot.start(bootstrap_signin=True)
+        logger.info(f"Running command: {' '.join(cmd)}")
+        # Run synchronous for signin (it waits for user interaction)
+        # In a real async architecture we might mistakenly block the thread pool, 
+        # but BackgroundTasks runs in a thread pool so it's okay.
+        process = subprocess.run(cmd, capture_output=True, text=True)
         
-        # If we reached here without exception, success
-        if bot_id in BOTS_DB:
-            BOTS_DB[bot_id]["status"] = BotStatus.LOGGED_IN
-        logger.info(f"Sign-in SUCCESS for {bot_id}")
+        if process.returncode == 0:
+            if bot_id in BOTS_DB:
+                BOTS_DB[bot_id]["status"] = BotStatus.LOGGED_IN
+            logger.info(f"Sign-in SUCCESS for {bot_id}")
+        else:
+            logger.error(f"Sign-in FAILED for {bot_id}. Exit code: {process.returncode}")
+            logger.error(f"Stdout: {process.stdout}")
+            logger.error(f"Stderr: {process.stderr}")
+            if bot_id in BOTS_DB:
+                BOTS_DB[bot_id]["status"] = BotStatus.LOGIN_REQUIRED
         
     except Exception as e:
-        logger.error(f"Sign-in FAILED for {bot_id}: {e}")
+        logger.error(f"Sign-in process FAILED for {bot_id}: {e}")
         if bot_id in BOTS_DB:
             BOTS_DB[bot_id]["status"] = BotStatus.LOGIN_REQUIRED
-    finally:
-        # Cleanup is handled inside bot.start() -> stop(), but we made need to ensure it's closed
-        # MeetBot.start(bootstrap_signin=True) calls perform_manual_signin which doesn't explicitly close browser if it returns normally?
-        # Let's check bot.py. 
-        # perform_manual_signin just does the work. 
-        # bot.start calls perform_manual_signin. 
-        # It does NOT call stop() automatically in start() unless exception?
-        # Actually in main.py it just exits.
-        # We should explicitly close the bot to free resources.
-        try:
-            bot.stop()
-        except:
-            pass
 
 def run_meeting_bot(bot_id: str, meeting_url: str, auth_dir: str):
     """
-    Executes the MeetBot join meeting flow in a background thread.
+    Executes the MeetBot join meeting flow via CLI in a separate process.
     Updates the global BOTS_DB state based on outcome.
     """
     logger.info(f"Starting meeting bot for {bot_id} (URL: {meeting_url})")
@@ -115,39 +116,41 @@ def run_meeting_bot(bot_id: str, meeting_url: str, auth_dir: str):
     if bot_id in BOTS_DB:
         BOTS_DB[bot_id]["status"] = BotStatus.IN_MEETING
 
-    # Initialize Bot (Force visible as requested)
-    bot = MeetBot(meeting_url=meeting_url, auth_dir=auth_dir, headless=False)
+    script_path = os.path.join("meetbot", "src", "main.py")
     
-    # Store active bot reference so we can stop it later if needed (future improvement)
-    ACTIVE_BOTS[bot_id] = bot
+    cmd = [
+        sys.executable, "-u", script_path,
+        "--meeting-url", meeting_url,
+        "--auth-dir", auth_dir
+        # No --headless flag passed, so it defaults to False (Headful) as requested by logic
+    ]
 
     try:
-        # This blocks until meeting ends or error
-        bot.start()
+        logger.info(f"Running command: {' '.join(cmd)}")
         
-        logger.info(f"Meeting ended for {bot_id}")
+        # Popen allows us to keep track of it if needed
+        process = subprocess.Popen(
+            cmd,
+            stdout=sys.stdout, # Stream to main log for now
+            stderr=sys.stderr
+        )
+        
+        ACTIVE_BOT_PROCESSES[bot_id] = process
+        
+        # Wait for completion (blocking this thread in the pool)
+        exit_code = process.wait()
+        
+        logger.info(f"Meeting ended for {bot_id} (Exit code: {exit_code})")
         
     except Exception as e:
         logger.error(f"Meeting bot {bot_id} execution FAILED: {e}")
     finally:
-        # Cleanup
-        try:
-            bot.stop()
-        except:
-            pass
-        
-        if bot_id in ACTIVE_BOTS:
-            del ACTIVE_BOTS[bot_id]
+        if bot_id in ACTIVE_BOT_PROCESSES:
+            del ACTIVE_BOT_PROCESSES[bot_id]
 
         if bot_id in BOTS_DB:
-            # We don't really know if they are logged out, but assuming back to required/ready state
-            # For now, let's revert to LOGIN_REQUIRED if we don't track persistent login state perfectly,
-            # or keep previous state. 
-            # Simplest for this MVP:
-            BOTS_DB[bot_id]["status"] = BotStatus.LOGGED_IN # Assuming success means they were logged in?
-            # Or revert to what it was? 
-            # Let's set to LOGGED_IN for now as a safe default after a meeting.
-
+            # Revert status
+            BOTS_DB[bot_id]["status"] = BotStatus.LOGGED_IN # Default safe state
 
 
 # --- API Endpoints ---
@@ -195,8 +198,6 @@ def trigger_join(bot_id: str, request: JoinMeetingRequest, background_tasks: Bac
     # Check if bot is already busy?
     if bot_data["status"] in [BotStatus.LOGIN_IN_PROGRESS, BotStatus.IN_MEETING]:
         # Optional: block new requests or just allow it (killing previous?)
-        # For this MVP, we'll just allow it to spawn. 
-        # Ideally we should stop the previous one.
         pass
 
     # Directory

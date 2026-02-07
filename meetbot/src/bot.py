@@ -6,9 +6,9 @@ import os
 import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-from src.config import SELECTORS, BROWSER_LAUNCH_ARGS, TIMEOUTS, CHECK_INTERVAL
-from src.logger import setup_logger
-from src.recorder import MeetingRecorder
+from .config import SELECTORS, BROWSER_LAUNCH_ARGS, TIMEOUTS, CHECK_INTERVAL
+from .logger import setup_logger
+from .recorder import MeetingRecorder
 
 logger = setup_logger(__name__)
 
@@ -33,7 +33,7 @@ class MeetBot:
         logger.info(f"Launching browser (Headless: {self.headless})")
         self.browser_context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=self.auth_dir,
-            headless=False,
+            headless=self.headless,
             args=BROWSER_LAUNCH_ARGS,
         )
         # self.browser_context.grant_permissions(["microphone", "camera"])

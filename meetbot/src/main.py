@@ -15,6 +15,8 @@ from src.logger import setup_logger
 logger = setup_logger("main")
 
 def main():
+    print(">>> MAIN STARTED <<<", flush=True)
+
     parser = argparse.ArgumentParser(description="Google Meet Bot")
     parser.add_argument("--meeting-url", help="URL of the Google Meet")
     parser.add_argument("--auth-dir", default=DEFAULT_AUTH_DIR, help="Directory for browser profile (cookies/cache)")
