@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  transcriber:
+    build: .
+    volumes:
+      # Mount audio files directory
+      - ./audio:/audio
+    # For file transcription, run with:
+    # docker-compose run transcriber --file /audio/your_audio.wav

@@ -45,3 +45,10 @@ python meetbot/src/main.py --meeting-url "https://meet.google.com/vpw-gchk-rme"
 
 
   docker run --rm -it meetbot --meeting-url "https://meet.google.com/vpw-gchk-rme"
+
+
+  docker run --rm `
+  -v "D:/Projects/Python Projects/Meet Assistant/meetbot/recordings:/app/recordings" `
+  -v "D:/Projects/Python Projects/Meet Assistant/meetbot/user_data:/app/user_data" `
+  meetbot `
+  --meeting-url "https://meet.google.com/umy-ekbh-ekw"

@@ -49,14 +49,27 @@ class MeetingRecorder:
                 "-framerate", str(FRAMERATE),
                 "-i", f"title={window_title}"
             ])
-        elif VIDEO_RECORDING_ENABLED and not window_title and not is_audio_only:
+        if VIDEO_RECORDING_ENABLED and not window_title and not is_audio_only:
              logger.warning("Video recording enabled but no window title provided. Falling back to audio only.")
 
-        # Audio Input (dshow)
-        command.extend([
-            "-f", "dshow",
-            "-i", f"audio={AUDIO_DEVICE_NAME}"
-        ])
+        # Audio Input
+        import platform
+        system = platform.system()
+
+        if system == "Windows":
+            command.extend([
+                "-f", "dshow",
+                "-i", f"audio={AUDIO_DEVICE_NAME}"
+            ])
+        elif system == "Linux":
+             # Use PulseAudio
+             command.extend([
+                 "-f", "pulse",
+                 "-i", AUDIO_DEVICE_NAME 
+             ])
+        else:
+            logger.warning(f"Unsupported OS: {system}. Audio recording might fail.")
+
 
         # Output options
         if ext == "wav":

@@ -1,0 +1,16 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Audio files (mount instead)
+*.wav
+*.mp3
+*.m4a
+*.ogg
+
+# Model cache (will be downloaded at runtime)
+*.bin

@@ -147,17 +147,20 @@ class MeetBot:
             try:
                 # Check participant count for recording logic
                 count = self._get_participant_count_safe()
-                logger.info(f"Current participants: {count}")
-                
+                # Debug logging for recording trigger
+                if count != 1: # Reduce noise, only log when not just bot
+                     logger.debug(f"Participants: {count}, Required > {MIN_PARTICIPANTS_TO_RECORD}, Recorder Active: {bool(self.recorder.process)}")
+
                 # Recording Logic
                 if count > MIN_PARTICIPANTS_TO_RECORD:
                     if not self.recorder.process:
-                         logger.info(f"Participant count ({count}) > {MIN_PARTICIPANTS_TO_RECORD}. Starting recording...")
-                         # We don't need window title for audio-only, but passing something is fine
+                         logger.info(f"Triggering recording: Participants ({count}) > Threshold ({MIN_PARTICIPANTS_TO_RECORD})")
                          self.recorder.start_recording(window_title=None)
-                
-                # We do NOT stop recording if count drops, usually better to record until end.
-                # But if you wanted to stop when people leave, you could add logic here.
+                    else:
+                        logger.debug("Recording already in progress.")
+                else:
+                    if self.recorder.process:
+                        logger.info("Participant count dropped. Keeping recording active (policy: record until end).")
                 # For now, we record until the bot leaves.
                 
                 # Auto-leave Logic

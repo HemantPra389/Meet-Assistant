@@ -9,12 +9,13 @@ DEFAULT_MEETING_URL = "https://meet.google.com"
 
 # Recording Settings
 FFMPEG_CMD = "ffmpeg"
-# NOTE: Run `ffmpeg -list_devices true -f dshow -i dummy` to find your device name
-AUDIO_DEVICE_NAME = "Stereo Mix" 
+# NOTE: Run `ffmpeg -list_devices true -f dshow -i dummy` to find your device name on Windows
+# On Linux (Docker), 'default' usually works with PulseAudio
+AUDIO_DEVICE_NAME = "default" 
 RECORDINGS_DIR = "./recordings"
 VIDEO_RECORDING_ENABLED = True
 FRAMERATE = 30
-MIN_PARTICIPANTS_TO_RECORD = 2
+MIN_PARTICIPANTS_TO_RECORD = 1
 AUDIO_FORMAT = "wav"
 
 # Monitoring Settings
