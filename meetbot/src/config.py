@@ -60,10 +60,12 @@ BROWSER_LAUNCH_ARGS = [
     "--use-fake-device-for-media-stream", # Provides a fake camera/mic device
     "--disable-notifications",
     "--no-default-browser-check",
-    "--disable-blink-features=AutomationControlled",
     "--disable-gpu",
     "--no-sandbox",
     "--disable-dev-shm-usage",
+    # ── Audio output fixes (critical for recording) ──
+    "--autoplay-policy=no-user-gesture-required",    # Allow meeting audio to play without click
+    "--disable-features=AudioServiceSandbox",         # Let Chrome access PulseAudio in container
 ]
 
 # Timeouts (in milliseconds)

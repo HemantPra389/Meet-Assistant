@@ -1,19 +1,33 @@
 #!/bin/bash
+set -e
 
-# Start virtual display
+# ── Virtual Display ──
 Xvfb :99 -screen 0 1920x1080x24 &
 export DISPLAY=:99
 
-# Start PulseAudio
+# ── PulseAudio Setup ──
 rm -rf /var/run/pulse /var/lib/pulse /root/.config/pulse
 
-# Fix PulseAudio "Access denied" by allowing anonymous auth
-# This is safe in a container
+# Fix PulseAudio "Access denied" by allowing anonymous auth (safe in container)
 if ! grep -q "auth-anonymous=1" /etc/pulse/system.pa; then
     echo "load-module module-native-protocol-unix auth-anonymous=1" >> /etc/pulse/system.pa
 fi
 
+# Configure ALSA to route through PulseAudio (needed for Chrome audio output)
+mkdir -p /etc/alsa/conf.d
+cat > /etc/asound.conf << 'EOF'
+pcm.!default {
+    type pulse
+}
+ctl.!default {
+    type pulse
+}
+EOF
+
 pulseaudio -D --exit-idle-time=-1 --system --disallow-exit
+
+# CRITICAL: Tell Chrome (and ffmpeg) where PulseAudio is running
+export PULSE_SERVER=unix:/var/run/pulse/native
 
 # Wait for PulseAudio to be ready
 echo "Waiting for PulseAudio..."
@@ -37,6 +51,15 @@ pactl load-module module-null-sink \
     channels=1
 pactl set-default-sink virtual_sink
 pactl set-default-source virtual_sink.monitor
+
+# ── Audio Diagnostics ──
+echo "=== Audio Setup Diagnostics ==="
+echo "Default sink:   $(pactl get-default-sink 2>/dev/null || pactl info | grep 'Default Sink')"
+echo "Default source: $(pactl get-default-source 2>/dev/null || pactl info | grep 'Default Source')"
+echo "PULSE_SERVER:   $PULSE_SERVER"
+pactl list short sinks
+pactl list short sources
+echo "================================"
 
 # Small wait to ensure Xvfb starts
 sleep 2
