@@ -5,7 +5,11 @@ import datetime
 import time
 from pathlib import Path
 from .logger import setup_logger
-from .config import FFMPEG_CMD, AUDIO_DEVICE_NAME, RECORDINGS_DIR, VIDEO_RECORDING_ENABLED, FRAMERATE, AUDIO_FORMAT
+from .config import (
+    FFMPEG_CMD, AUDIO_DEVICE_NAME, RECORDINGS_DIR, VIDEO_RECORDING_ENABLED,
+    FRAMERATE, AUDIO_FORMAT, AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, AUDIO_BITRATE,
+    AUDIO_BIT_DEPTH,
+)
 
 logger = setup_logger(__name__)
 
@@ -59,25 +63,35 @@ class MeetingRecorder:
         if system == "Windows":
             command.extend([
                 "-f", "dshow",
+                "-thread_queue_size", "1024",
                 "-i", f"audio={AUDIO_DEVICE_NAME}"
             ])
         elif system == "Linux":
              # Use PulseAudio
              command.extend([
                  "-f", "pulse",
-                 "-i", AUDIO_DEVICE_NAME 
+                 "-thread_queue_size", "1024",
+                 "-i", AUDIO_DEVICE_NAME
              ])
         else:
             logger.warning(f"Unsupported OS: {system}. Audio recording might fail.")
 
-
-        # Output options
-        if ext == "wav":
-             # Use pcm_s16le for standard WAV
-             command.extend(["-c:a", "pcm_s16le"])
-        
+        # Audio quality settings
         command.extend([
-            "-y", # Overwrite
+            "-ar", str(AUDIO_SAMPLE_RATE),  # Sample rate (48 kHz)
+            "-ac", str(AUDIO_CHANNELS),      # Channels (mono)
+        ])
+
+        # Output codec & format options
+        if ext == "wav":
+             # 24-bit PCM for higher dynamic range
+             command.extend(["-c:a", f"pcm_{AUDIO_BIT_DEPTH}"])
+        else:
+             # For compressed formats, set bitrate
+             command.extend(["-b:a", AUDIO_BITRATE])
+
+        command.extend([
+            "-y",  # Overwrite
             self.output_file
         ])
 

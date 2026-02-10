@@ -25,8 +25,16 @@ for i in {1..10}; do
     sleep 1
 done
 
-# Create a dummy sink to capture audio if no hardware device is present
-pactl load-module module-null-sink sink_name=virtual_sink sink_properties=device.description=Virtual_Sink
+# Create a high-quality virtual sink for audio capture
+# rate=48000: 48 kHz sample rate (matches ffmpeg -ar setting)
+# format=s24le: 24-bit depth (matches ffmpeg pcm_s24le codec)
+# channels=1: mono (sufficient for meeting audio)
+pactl load-module module-null-sink \
+    sink_name=virtual_sink \
+    sink_properties=device.description=Virtual_Sink \
+    rate=48000 \
+    format=s24le \
+    channels=1
 pactl set-default-sink virtual_sink
 pactl set-default-source virtual_sink.monitor
 

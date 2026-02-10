@@ -11,12 +11,19 @@ DEFAULT_MEETING_URL = "https://meet.google.com"
 FFMPEG_CMD = "ffmpeg"
 # NOTE: Run `ffmpeg -list_devices true -f dshow -i dummy` to find your device name on Windows
 # On Linux (Docker), 'default' usually works with PulseAudio
-AUDIO_DEVICE_NAME = "default" 
-RECORDINGS_DIR = "./recordings"
+AUDIO_DEVICE_NAME = "default"
+# Absolute path inside container — mapped to a Docker volume for persistence
+RECORDINGS_DIR = "/app/recordings"
 VIDEO_RECORDING_ENABLED = True
 FRAMERATE = 30
 MIN_PARTICIPANTS_TO_RECORD = 1
 AUDIO_FORMAT = "wav"
+
+# Audio Quality Settings
+AUDIO_SAMPLE_RATE = 48000   # 48 kHz — high quality, ideal for speech
+AUDIO_CHANNELS = 1          # Mono — sufficient for meeting audio
+AUDIO_BITRATE = "192k"      # For non-WAV formats (mp3, aac)
+AUDIO_BIT_DEPTH = "s24le"   # 24-bit PCM for WAV — better dynamic range than 16-bit
 
 # Monitoring Settings
 CHECK_INTERVAL = 2  # Seconds between checks

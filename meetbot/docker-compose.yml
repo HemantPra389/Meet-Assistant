@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  meetbot:
+    build: .
+    shm_size: '2gb'
+    volumes:
+      # Persistent recording storage — survives container removal
+      - meetbot-recordings:/app/recordings
+      # Browser session persistence (Google login etc.)
+      - ./user_data:/app/user_data
+    environment:
+      - DISPLAY=:99
+      - PULSE_SERVER=unix:/var/run/pulse/native
+
+volumes:
+  meetbot-recordings:
+    name: meetbot-recordings
