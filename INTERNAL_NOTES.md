@@ -52,3 +52,9 @@ python meetbot/src/main.py --meeting-url "https://meet.google.com/vpw-gchk-rme"
   -v "D:/Projects/Python Projects/Meet Assistant/meetbot/user_data:/app/user_data" `
   meetbot `
   --meeting-url "https://meet.google.com/umy-ekbh-ekw"
+
+
+Container Running commands of Meetbot
+cd meetbot
+docker-compose build
+docker-compose run meetbot --meeting-url <URL> --headless
